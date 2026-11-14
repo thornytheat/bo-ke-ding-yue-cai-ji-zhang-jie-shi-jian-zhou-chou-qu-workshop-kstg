@@ -232,3 +232,49 @@ export interface Paginated<T> {
   page: number;
   size: number;
 }
+
+export type ExportPackageStatus = 'building' | 'sealed' | 'failed';
+
+export interface ExportFileManifest {
+  bytes: number;
+  sha256: string;
+  data_rows: number;
+}
+
+export interface ExportPackageDiff {
+  against: string | null;
+  summary: {
+    episodes: number;
+    chapters: number;
+    issues: number;
+    total_duration_s: number;
+  };
+  episodes_added: string[];
+  episodes_removed: string[];
+  episodes_changed: {
+    episode_code: string;
+    title: string;
+    fields: Record<string, { from: unknown; to: unknown }>;
+  }[];
+}
+
+export interface ExportPackage {
+  id: number;
+  code: string;
+  status: ExportPackageStatus;
+  status_label: string;
+  digest_task_code: string;
+  episode_rows: number;
+  chapter_rows: number;
+  issue_rows: number;
+  total_duration_s: number;
+  zip_bytes: number;
+  zip_sha256: string;
+  manifest: Record<string, ExportFileManifest>;
+  diff: ExportPackageDiff;
+  error_text: string;
+  created_by: string;
+  sealed_at: string | null;
+  created_at: string | null;
+  is_current?: boolean;
+}

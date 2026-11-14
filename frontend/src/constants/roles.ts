@@ -9,10 +9,19 @@ export const PERMISSIONS: Record<Role, string[]> = {
     'chapter:write',
     'issue:resolve',
     'export:read',
+    'export:publish',
     'audit:read',
     'library:read',
   ],
-  analyst: ['task:run', 'episode:write', 'chapter:write', 'issue:resolve', 'export:read', 'library:read'],
+  analyst: [
+    'task:run',
+    'episode:write',
+    'chapter:write',
+    'issue:resolve',
+    'export:read',
+    'export:publish',
+    'library:read',
+  ],
   viewer: ['library:read', 'export:read'],
 };
 

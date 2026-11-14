@@ -6,11 +6,11 @@ from src.constants.enums import ROLE_LABELS, Role
 PERMISSIONS: dict[str, set[str]] = {
     Role.ADMIN.value: {
         "feed:write", "task:run", "episode:write", "chapter:write",
-        "issue:resolve", "export:read", "audit:read", "library:read",
+        "issue:resolve", "export:read", "export:publish", "audit:read", "library:read",
     },
     Role.ANALYST.value: {
         "task:run", "episode:write", "chapter:write", "issue:resolve",
-        "export:read", "library:read",
+        "export:read", "export:publish", "library:read",
     },
     Role.VIEWER.value: {"library:read", "export:read"},
 }
@@ -23,6 +23,8 @@ CHAPTER_WRITE_ROLES = (Role.ADMIN.value, Role.ANALYST.value)
 EPISODE_WRITE_ROLES = (Role.ADMIN.value, Role.ANALYST.value)
 ISSUE_RESOLVE_ROLES = (Role.ADMIN.value, Role.ANALYST.value)
 EXPORT_ROLES = (Role.ADMIN.value, Role.ANALYST.value, Role.VIEWER.value)
+# 发布新不可变包是运营动作；剪辑师（viewer）只读、只能下载历史/当前包
+EXPORT_PUBLISH_ROLES = (Role.ADMIN.value, Role.ANALYST.value)
 AUDIT_ROLES = (Role.ADMIN.value,)
 
 

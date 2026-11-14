@@ -2047,3 +2047,210 @@ code {
   color: var(--cream-faint);
   margin-bottom: 4px;
 }
+
+/* ---------- 不可变导出发布包 ---------- */
+.pkg-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 12px 0 26px;
+}
+
+.pkg-card {
+  position: relative;
+  border: 1px solid var(--rule-soft);
+  border-left: 3px solid var(--cab-4);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, oklch(0.262 0.014 58 / 0.92), oklch(0.235 0.013 58 / 0.92));
+  padding: 16px 18px 14px;
+  box-shadow: var(--shadow-lift);
+}
+
+.pkg-card.pkg-current {
+  border-left-color: var(--tape);
+  background: linear-gradient(180deg, oklch(0.285 0.02 58 / 0.96), oklch(0.245 0.015 58 / 0.96));
+}
+
+.pkg-card.pkg-building {
+  border-left-color: var(--warn);
+}
+
+.pkg-card.pkg-failed {
+  border-left-color: var(--bad);
+}
+
+.pkg-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.pkg-id {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pkg-code {
+  font-size: 1.06rem;
+  letter-spacing: 0.02em;
+}
+
+.pkg-meta {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: 0.7rem;
+  color: var(--cream-faint);
+}
+
+.pkg-error {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border: 1px solid oklch(0.46 0.12 28 / 0.6);
+  border-radius: var(--radius);
+  background: oklch(0.32 0.06 28 / 0.32);
+  color: oklch(0.82 0.09 28);
+  font-size: 0.78rem;
+}
+
+/* 各表行数：剪辑清单 / 章节切点 / 异常清单 */
+.pkg-rows {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.pkg-row-count {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--radius);
+  background: oklch(0.225 0.012 58 / 0.7);
+}
+
+.pkg-row-name {
+  font-size: 0.72rem;
+  color: var(--cream-faint);
+}
+
+.pkg-row-num {
+  font-size: 1.3rem;
+  color: var(--tape-soft);
+}
+
+.pkg-row-unit {
+  font-size: 0.68rem;
+  color: var(--cream-faint);
+}
+
+.pkg-card-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pkg-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pkg-sha {
+  font-size: 0.66rem;
+  color: var(--cream-faint);
+}
+
+.pkg-detail {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--rule);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pkg-diff-summary {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 0.74rem;
+  margin: 8px 0;
+}
+
+.pkg-delta-up {
+  color: var(--ok);
+}
+
+.pkg-delta-down {
+  color: var(--bad);
+}
+
+.pkg-delta-flat {
+  color: var(--cream-faint);
+}
+
+.pkg-diff-list {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.78rem;
+}
+
+.pkg-diff-fields {
+  display: inline-flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-left: 8px;
+}
+
+.pkg-diff-field {
+  font-size: 0.7rem;
+  color: var(--warn);
+}
+
+.pkg-diff-empty {
+  margin: 6px 0 2px;
+}
+
+.pkg-checksum {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.68rem;
+  color: var(--cream-faint);
+}
+
+.pkg-checksum-row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 4px 0;
+  border-bottom: 1px dotted var(--rule-soft);
+}
+
+.pkg-checksum-name {
+  color: var(--cream-soft);
+  min-width: 150px;
+}
+
+@media (max-width: 860px) {
+  .pkg-rows {
+    grid-template-columns: 1fr;
+  }
+
+  .pkg-card-head {
+    flex-direction: column;
+  }
+}

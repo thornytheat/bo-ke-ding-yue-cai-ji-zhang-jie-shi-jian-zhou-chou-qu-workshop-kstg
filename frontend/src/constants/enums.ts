@@ -71,6 +71,19 @@ export const TASK_MODE_LABELS: Record<string, string> = {
   both: '采集 + 解析',
 };
 
+export const EXPORT_PACKAGE_STATUS_LABELS: Record<string, string> = {
+  building: '构建中（不可下载）',
+  sealed: '已封版（可下载）',
+  failed: '构建失败（已废弃）',
+};
+
+export function exportStatusTone(status: string): 'tape' | 'ok' | 'bad' | 'muted' {
+  if (status === 'sealed') return 'ok';
+  if (status === 'building') return 'tape';
+  if (status === 'failed') return 'bad';
+  return 'muted';
+}
+
 export const PARSE_RULE_LABELS: Record<string, string> = {
   hh_mm_ss: 'hh:mm:ss',
   mm_ss: 'mm:ss',

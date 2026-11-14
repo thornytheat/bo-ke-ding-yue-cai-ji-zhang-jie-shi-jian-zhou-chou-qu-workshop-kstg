@@ -34,7 +34,7 @@
 4. 09:06 内容运营打开 `EP-044 城市漫游 · 泉州`，重跑解析 → 「约 12 分钟处」落到 **720s**；
 5. 09:07 点「应用不变量修正」：3 条乱序重排、1 条重叠合并、0 条过短折叠，该集异常清零；
 6. 09:10 到「异常队列」复核剩余 18 条，处置 2 条缺口告警并写明依据；
-7. 09:15 导出**剪辑清单 CSV（48 行，含起止秒与时长）**发给剪辑师；
+7. 09:15 点「发布不可变剪辑包」：冻结当前解析口径（48 集 / 260 章 / 22 异常 / 时长汇总），行数与 sha256 核对一致后封版 `EXP-xxxx`，剪辑师下载整包 ZIP（剪辑清单 / 章节切点 / 异常清单 + manifest）；再次发布若口径未变则复用同一版本，不产生半包，历史包持续可下载；
 8. 剪辑师用只读账号登录，只能看节目库 / 章节时间轴 / 导出清单，改章节返回 403。
 
 ## 2. 主要功能
@@ -45,7 +45,7 @@
 | 运行 | `/feeds` | 采集 / 解析 / 采集+解析 三种批次，投递 Celery worker，前端轮询批次状态与日志 |
 | 解析计算 | 后端 `parse_service` / `validation_service` | 时间戳正则族解析 + 章节窗口不变量校验（见 §5） |
 | 复核归因 | `/issues`、`/episodes/:code` | 22 条异常工单按类型归因、给出修正建议、内联编辑章节、一键应用不变量修正 |
-| 导出 | `/issues` | 剪辑清单 CSV（每集一行）、章节切点 CSV（每章一行）、异常清单 CSV |
+| 发布 | `/issues` | 不可变发布包：按同一解析批次冻结集数/章节/异常/时长，行数与 sha256 三方核对一致才封版；当前包 + 历史包状态、各表行数、版本差异；封版后整包 ZIP / 三份 CSV 持续可下载 |
 | 看板 | `/library` | 节目库：时长、章节数、解析状态、异常数、未识别数；筛选 / 搜索 / 分页 |
 
 ## 3. 演示账号
@@ -54,9 +54,9 @@
 
 | 邮箱 | 角色 | 权限 | 典型动作 |
 |---|---|---|---|
-| `admin@podcastdig.io` | 运营主管 | 全部（含 feed:write、audit:read） | 维护订阅源、跑批次、处置异常、导出、看审计 |
-| `analyst@podcastdig.io` | 内容运营 | task:run / chapter:write / issue:resolve / export:read | 跑采集解析、修章节、处置异常、导出 |
-| `viewer@podcastdig.io` | 剪辑师（只读） | library:read / export:read | 看节目库与时间轴、导出剪辑清单；改章节/跑批次返回 403 |
+| `admin@podcastdig.io` | 运营主管 | 全部（含 feed:write、export:publish、audit:read） | 维护订阅源、跑批次、处置异常、发布不可变包、看审计 |
+| `analyst@podcastdig.io` | 内容运营 | task:run / chapter:write / issue:resolve / export:read / export:publish | 跑采集解析、修章节、处置异常、发布不可变包 |
+| `viewer@podcastdig.io` | 剪辑师（只读） | library:read / export:read | 看节目库与时间轴、下载当前/历史发布包；发布包/改章节/跑批次返回 403 |
 
 权限判定在服务端（`src/middlewares/rbac.py` + 路由依赖），前端只是隐藏入口。
 
@@ -117,7 +117,20 @@ cd frontend && npm install && npm run dev   # /api 代理到 19252
 
 失败态：整集没有可识别时间码 → `failed` 状态 + `unparsed:all` 工单；越界 / 重复时间点写入返回 422 / 409。
 
-## 6. 数据模型（4 个核心实体 + 2 张支撑表）
+### 发布口径：不可变发布包（`backend/src/services/export_package_service.py`）
+
+剪辑清单不再「随读随导」——直接读变化中的库会在解析跑到一半时冻结到新旧混杂的口径，且旧下载地址会被后次导出覆盖、无从追溯。每次发布做成一个**不可变发布包**（`export_packages`）：
+
+1. **同批冻结**：在单次构建、同一 DB 会话里依次读取集数 / 章节 / 异常 / 时长汇总与三份 CSV，锚定最近一次成功解析批次（`digest_task_code`），冻结进 `snapshot`；
+2. **三方核对才封版**：构造器行数 == CSV 实际数据行 == 冻结快照行数；逐文件落盘后复算字节与 sha256，确定性打 ZIP 后再复算整包 sha256。任一不符 → 整包判 `failed`，临时目录清除，**不留半包**；
+3. **原子发布**：先写 `staging/`（对外不可见），核对通过后 `rename` 到 `packages/` 并置只读、状态置 `sealed`，此时才开放下载；`building` 半包与 `failed` 包一律不可下载；
+4. **重试不重复生成版本**：对冻结口径 + 三份 CSV 内容取 `content_fingerprint`（唯一索引）。数据未变则命中既有 `sealed` 包直接复用（`reused=true`），不新增版本；并发抢占唯一指纹时复用胜者或返回 409 提示等待；
+5. **历史包持续可下载、不可变**：`sealed` 包永不覆盖、永不删除，下载前再次复算 sha256，文件被篡改则拦截（`EXPORT_CHECKSUM_MISMATCH`）；
+6. **可追溯**：整包 ZIP 内含 `manifest.json`（冻结汇总 + 每文件字节/sha256/行数 + 封版时间），文件名带包 code（如 `EXP-0003-chapter-cuts.csv`），外包拿到的切点可回溯到具体发布；
+7. **版本差异**：每个包记录相对上一封版包的汇总增减与逐集增删改（`diff`），页面展示当前包/历史包状态、三表行数与差异；
+8. **崩溃自愈**：进程中断残留的 `building` 行超过 30 分钟自动回收为 `failed` 并放行重试。
+
+## 6. 数据模型（4 个核心实体 + 3 张支撑表）
 
 | 实体 | 表 | 贯穿位置 |
 |---|---|---|
@@ -126,7 +139,7 @@ cd frontend && npm install && npm run dev   # /api 代理到 19252
 | Chapter 章节 | `chapters` | `models/chapter.py` → `schemas/episode.py` → `services/chapter_service.py` → `controllers/chapter_controller.py` → `routes/episodes.py` → `api/episodes.ts` → `pages/EpisodeDetail.tsx` |
 | DigestTask 采集批次 | `digest_tasks` | `models/digest_task.py` → `schemas/task.py` → `services/task_service.py` / `digest_service.py` → `controllers/task_controller.py` → `routes/tasks.py` → `api/tasks.ts` → `pages/Feeds.tsx` |
 
-支撑表：`chapter_issues`（不变量校验产出的异常工单，可人工处置）、`audit_logs`（审计）、`users`。
+支撑表：`chapter_issues`（不变量校验产出的异常工单，可人工处置）、`export_packages`（不可变发布包：冻结快照 / 行数 / 差异 / 校验值 / 落盘路径）、`audit_logs`（审计）、`users`。
 
 ## 7. 目录
 
@@ -143,9 +156,9 @@ gb-579/
 │   └── src/
 │       ├── config/             # settings / database / app / celery_app
 │       ├── constants/          # enums（共享枚举唯一定义）/ roles / error_codes / limits
-│       ├── models/             # 7 张表
+│       ├── models/             # 8 张表（含 export_packages 不可变发布包）
 │       ├── schemas/            # 入参校验
-│       ├── services/           # parse / validation / digest / fixture / feed / episode / chapter / issue / export / task / summary / audit
+│       ├── services/           # parse / validation / digest / fixture / feed / episode / chapter / issue / export / export_package / task / summary / audit
 │       ├── controllers/        # 8 个 controller
 │       ├── routes/             # 9 组路由，统一 /api 前缀
 │       ├── middlewares/        # auth(JWT) / rbac / rate_limit / audit_logger / error_handler
@@ -192,7 +205,7 @@ gb-579/
 | `SEED_DEMO` | `true` | 启动自动 seed（幂等） |
 | `RATE_LIMIT_PER_MINUTE` / `RATE_LIMIT_WRITE_PER_MINUTE` | `600` / `120` | 读 / 写限流 |
 | `FIXTURE_DIR` | `/app/fixtures` | 确定性订阅源快照目录 |
-| `EXPORT_DIR` | `/app/var/exports` | 导出留档（命名卷 `tape_archive`） |
+| `EXPORT_DIR` | `/app/var/exports` | 不可变发布包留档：`packages/`（sealed 只读整包）+ `staging/`（构建临时目录），命名卷 `tape_archive` |
 
 ## 9. Docker 说明
 
@@ -217,11 +230,11 @@ gb-579/
 - 3 账号 / 6 订阅源 / 48 单集 / **260 章节** / **22 异常工单** / 4 条历史批次；
 - 章节与工单**不是手写常量**：seed 调用生产同款 `parse_service` + `validation_service`，所以种子里的数字就是算法跑出来的数字；
 - 自然键 upsert：`users.email`、`feeds.code`、`episodes.guid`、`chapters.seed_key`、`chapter_issues.issue_key`、`digest_tasks.code`；
-- 重复执行不新增、不覆盖人工修改（章节只在「该集还没有任何章节」时生成；工单只补缺失 key）；
-- 结束打印一行（两次运行逐字一致）：
+- 重复执行不新增、不覆盖人工修改（章节只在「该集还没有任何章节」时生成；工单只补缺失 key；已有 sealed 发布包则不重复封版）；
+- 结束打印一行（不做其他操作、仅重复跑 seed 时逐字一致）：
 
 ```
-SEED_SUMMARY brand=podcastdig feeds=6 episodes=48 chapters=260 issues=22 users=3
+SEED_SUMMARY brand=podcastdig feeds=6 episodes=48 chapters=260 issues=22 users=3 export_packages=1
 ```
 
 手动重跑：`docker compose exec backend python -m scripts.seed_demo`
@@ -240,6 +253,7 @@ SEED_SUMMARY brand=podcastdig feeds=6 episodes=48 chapters=260 issues=22 users=3
 | `IssueKind` | `constants/enums.py` | `constants/enums.ts`（含展示顺序） | `chapter_issues.kind`、异常队列筛选、`IssueMixBar` 配色 |
 | `IssueStatus` | `constants/enums.py` | `types/models.ts` | `chapter_issues.status`、异常队列状态列 |
 | `TaskMode` / `TaskStatus` | `constants/enums.py` | `constants/enums.ts` | `digest_tasks.mode/status`、Feeds 批次账本 |
+| `ExportPackageStatus` | `constants/enums.py` | `constants/enums.ts`（标签）+ `types/models.ts`（类型） | `export_packages.status`、发布包状态胶囊与下载门禁 |
 
 `constants/roles.py`（权限点）与 `frontend/src/constants/roles.ts` 也是成对维护。
 
@@ -249,7 +263,8 @@ SEED_SUMMARY brand=podcastdig feeds=6 episodes=48 chapters=260 issues=22 users=3
 2. **字体依赖 Google Fonts**：`Chivo` / `IBM Plex Mono` 走 Google Fonts；离线环境回退到 `PingFang SC / Hiragino Sans GB / 系统等宽`，中文观感与在线略有差异（详见 test-artifacts 的 TESTING）。
 3. **「采集新增」的口径**：seed 契约锁定 `episodes=48`，所以「新增 3」指**水位线之后新到达、尚未入库采集**的 3 集（`ingest_state=pending` → 采集时置 `synced`），采集不改变单集总数；「更新 5」是平台改写简介的 5 集。
 4. 演示环境用 `Base.metadata.create_all` 建表，`migrations/0001_initial.sql` 只是同结构的可审阅 DDL，没有引入 Alembic。
-5. 批次同步执行（单进程 worker，48 集毫秒级完成）；真实场景应改成流式分片 + 失败重试队列。
+5. 批次与发布包均同步执行（单进程 worker，48 集毫秒级完成）；真实场景应改成流式分片 + 失败重试队列，发布包构建也可投递 worker 并把大文件落到对象存储（当前写共享卷 `tape_archive`）。
+6. 发布包没有保留策略：`sealed` 包按设计永久保留、不自动清理，长期运行需另配归档/冷存储生命周期。
 
 ## License
 

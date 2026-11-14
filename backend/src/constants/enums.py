@@ -76,6 +76,14 @@ class TaskStatus(StrEnum):
     FAILED = "failed"
 
 
+class ExportPackageStatus(StrEnum):
+    """不可变导出发布包状态：building 半包不可下载，sealed 核对通过后才开放。"""
+
+    BUILDING = "building"
+    SEALED = "sealed"
+    FAILED = "failed"
+
+
 FEED_KIND_LABELS: dict[str, str] = {
     FeedKind.RSS.value: "RSS 订阅",
     FeedKind.PLATFORM.value: "平台接口",
@@ -134,6 +142,12 @@ TASK_STATUS_LABELS: dict[str, str] = {
     TaskStatus.RUNNING.value: "运行中",
     TaskStatus.SUCCESS.value: "成功",
     TaskStatus.FAILED.value: "失败",
+}
+
+EXPORT_PACKAGE_STATUS_LABELS: dict[str, str] = {
+    ExportPackageStatus.BUILDING.value: "构建中（不可下载）",
+    ExportPackageStatus.SEALED.value: "已封版（可下载）",
+    ExportPackageStatus.FAILED.value: "构建失败（已废弃）",
 }
 
 ROLE_LABELS: dict[str, str] = {

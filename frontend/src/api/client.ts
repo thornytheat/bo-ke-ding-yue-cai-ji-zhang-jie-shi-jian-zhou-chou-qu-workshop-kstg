@@ -48,25 +48,3 @@ export const http = {
     request<T>(path, { method: 'PATCH', body: body === undefined ? undefined : JSON.stringify(body) }),
   del: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
 };
-
-/** CSV 下载：带上 JWT 走 fetch，再触发浏览器保存（避免 <a href> 丢 Authorization）。 */
-export async function downloadCsv(path: string, filename: string): Promise<number> {
-  const token = authStore.getToken();
-  const response = await fetch(`${BASE}${path}`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  });
-  if (!response.ok) {
-    const text = await response.text();
-    throw new ApiError(response.status, text ? safeParse(text) : null);
-  }
-  const blob = await response.blob();
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = filename;
-  document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
-  window.setTimeout(() => URL.revokeObjectURL(url), 2000);
-  return blob.size;
-}

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import ChapterTimeline from '../components/common/ChapterTimeline';
 import EmptyState from '../components/common/EmptyState';
 import IssueMixBar from '../components/common/IssueMixBar';
+import PackageManager from '../components/common/PackageManager';
 import PageHead from '../components/common/PageHead';
 import StatusPill from '../components/common/StatusPill';
 import TapeLabel from '../components/common/TapeLabel';
@@ -22,6 +23,7 @@ import type { EpisodeDetail } from '../types/models';
 export default function Issues() {
   const state = useAuth();
   const canResolve = can(state.user?.role, 'issue:resolve');
+  const canPublish = can(state.user?.role, 'export:publish');
 
   const [kind, setKind] = useState('');
   const [status, setStatus] = useState('open');
@@ -49,6 +51,7 @@ export default function Issues() {
   const summary = useAsync(() => issueApi.summary(), []);
   const feeds = useAsync(() => feedApi.list(), []);
   const overview = useAsync(() => summaryApi.overview(), []);
+  const packages = useAsync(() => exportApi.list(50), []);
   const issues = useAsync(
     () => issueApi.list({ kind: kind || undefined, status: status || undefined, feed: feed || undefined, size: 100 }),
     [kind, status, feed],
@@ -58,6 +61,7 @@ export default function Issues() {
     issues.reload();
     summary.reload();
     overview.reload();
+    packages.reload();
   };
 
   const resolve = async (id: number) => {
@@ -86,21 +90,18 @@ export default function Issues() {
     }
   };
 
-  const download = async (kindName: 'clip' | 'chapter' | 'issuesCsv') => {
+  const publish = async () => {
     setBusy(true);
     try {
-      if (kindName === 'clip') {
-        const size = await exportApi.clipList();
-        uiStore.toast(`剪辑清单已下载（${Math.round(size / 1024)} KB）`);
-      } else if (kindName === 'chapter') {
-        const size = await exportApi.chapterCuts();
-        uiStore.toast(`章节切点清单已下载（${Math.round(size / 1024)} KB）`);
-      } else {
-        const size = await exportApi.issues();
-        uiStore.toast(`异常清单已下载（${Math.round(size / 1024)} KB）`);
-      }
+      const result = await exportApi.publish();
+      uiStore.toast(
+        result.reused
+          ? `口径未变化，复用当前包 ${result.package.code}，未生成新版本`
+          : `发布包 ${result.package.code} 已封版，核对一致并开放下载`,
+      );
+      packages.reload();
     } catch (error) {
-      uiStore.toast(errorMessage((error as { payload?: unknown })?.payload, '导出失败'), 'bad');
+      uiStore.toast(errorMessage((error as { payload?: unknown })?.payload, '发布失败'), 'bad');
     } finally {
       setBusy(false);
     }
@@ -121,17 +122,11 @@ export default function Issues() {
           </>
         }
         actions={
-          <>
-            <button type="button" className="btn btn-primary" disabled={busy} onClick={() => download('clip')}>
-              导出剪辑清单 CSV
+          canPublish ? (
+            <button type="button" className="btn btn-primary" disabled={busy} onClick={publish}>
+              发布不可变剪辑包
             </button>
-            <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => download('chapter')}>
-              章节切点 CSV
-            </button>
-            <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => download('issuesCsv')}>
-              异常清单 CSV
-            </button>
-          </>
+          ) : undefined
         }
       />
 
@@ -166,6 +161,21 @@ export default function Issues() {
           )}
         </div>
       </section>
+
+      <TapeLabel
+        eyebrow="RELEASE · 不可变发布包"
+        title="剪辑清单发布包"
+        meta={
+          <span className="mono">
+            {packages.data?.items.length ?? 0} 个版本 · 封版后冻结集数/章节/异常/时长，历史包持续可下载
+          </span>
+        }
+      />
+      <PackageManager
+        packages={packages.data?.items ?? []}
+        loading={packages.loading}
+        reload={packages.reload}
+      />
 
       <TapeLabel
         eyebrow="QUEUE · 工单"

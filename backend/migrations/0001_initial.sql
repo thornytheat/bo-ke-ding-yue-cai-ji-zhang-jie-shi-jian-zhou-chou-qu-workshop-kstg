@@ -162,3 +162,34 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   KEY ix_audit_action (action),
   KEY ix_audit_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 不可变导出发布包：building 半包不可下载，逐文件/整包 sha256 核对一致才 sealed。
+-- content_fingerprint 唯一（NULL 不参与唯一约束）：同数据重试复用同版本，失败行置 NULL 放行重试。
+CREATE TABLE IF NOT EXISTS export_packages (
+  id                INT AUTO_INCREMENT PRIMARY KEY,
+  code              VARCHAR(24)  NOT NULL,
+  status            VARCHAR(12)  NOT NULL DEFAULT 'building',
+  digest_task_code  VARCHAR(24)  NOT NULL DEFAULT '',
+  episode_rows      INT          NOT NULL DEFAULT 0,
+  chapter_rows      INT          NOT NULL DEFAULT 0,
+  issue_rows        INT          NOT NULL DEFAULT 0,
+  total_duration_s  INT          NOT NULL DEFAULT 0,
+  snapshot          JSON NULL,
+  diff              JSON NULL,
+  manifest          JSON NULL,
+  zip_sha256        VARCHAR(64)  NOT NULL DEFAULT '',
+  zip_path          VARCHAR(255) NOT NULL DEFAULT '',
+  zip_bytes         INT          NOT NULL DEFAULT 0,
+  content_fingerprint VARCHAR(64) NULL,
+  error_text        TEXT NULL,
+  created_by        VARCHAR(160) NOT NULL DEFAULT '',
+  created_role      VARCHAR(20)  NOT NULL DEFAULT '',
+  sealed_at         DATETIME     NULL,
+  created_at        DATETIME     NOT NULL,
+  UNIQUE KEY uq_export_packages_code (code),
+  UNIQUE KEY uq_export_packages_fingerprint (content_fingerprint),
+  KEY ix_export_packages_status (status),
+  KEY ix_export_packages_task (digest_task_code),
+  KEY ix_export_packages_zip_sha (zip_sha256),
+  KEY ix_export_packages_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

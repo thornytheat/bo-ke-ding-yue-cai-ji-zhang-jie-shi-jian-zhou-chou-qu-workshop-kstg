@@ -30,6 +30,7 @@ from src.models.chapter import Chapter
 from src.models.chapter_issue import ChapterIssue
 from src.models.digest_task import DigestTask
 from src.models.episode import Episode
+from src.models.export_package import ExportPackage
 from src.models.feed import Feed
 from src.models.user import User
 from src.services import validation_service
@@ -276,6 +277,20 @@ def ensure_audit(db) -> None:
     db.flush()
 
 
+def ensure_export_package(db) -> None:
+    """幂等封一个演示发布包：已有任意 sealed 包则跳过，不覆盖人工发布。"""
+    from src.services import export_package_service
+
+    existing = db.scalar(
+        select(ExportPackage).where(ExportPackage.status == "sealed").limit(1)
+    )
+    if existing is not None:
+        return
+    export_package_service.create_package(
+        db, {"email": "admin@podcastdig.io", "role": "admin"}
+    )
+
+
 def seed_all() -> str:
     with session_scope() as db:
         users = ensure_users(db)
@@ -291,9 +306,21 @@ def seed_all() -> str:
         user_count = db.scalar(select(func.count()).select_from(User)) or 0
         issue_total = db.scalar(select(func.count()).select_from(ChapterIssue)) or 0
 
+        # 演示环境预置一个可直接下载的封版发布包（幂等：已有 sealed 包则跳过）
+        ensure_export_package(db)
+        package_count = (
+            db.scalar(
+                select(func.count())
+                .select_from(ExportPackage)
+                .where(ExportPackage.status == "sealed")
+            )
+            or 0
+        )
+
     summary = (
         f"SEED_SUMMARY brand=podcastdig feeds={feed_count} episodes={episode_count} "
-        f"chapters={chapter_count} issues={issue_total} users={user_count}"
+        f"chapters={chapter_count} issues={issue_total} users={user_count} "
+        f"export_packages={package_count}"
     )
     logger.info("seed done, users=%s feeds=%s episodes=%s", user_count, feed_count, episode_count)
     print(summary, flush=True)

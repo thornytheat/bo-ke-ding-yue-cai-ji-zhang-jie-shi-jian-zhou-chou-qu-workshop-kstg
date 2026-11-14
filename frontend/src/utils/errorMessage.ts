@@ -13,6 +13,10 @@ const FALLBACK: Record<string, string> = {
   TASK_BUSY: '已有采集/解析批次在运行，请等待完成',
   FEED_INACTIVE: '订阅源已停用，无法运行采集',
   EXPORT_EMPTY: '没有可导出的数据',
+  EXPORT_BUILDING: '已有发布包正在构建，请等待封版完成',
+  EXPORT_NOT_SEALED: '该发布包尚未封版，暂不开放下载',
+  EXPORT_ARTIFACT_MISSING: '发布包文件缺失或已损坏',
+  EXPORT_CHECKSUM_MISMATCH: '发布包核对未通过，已拦截下载',
   INTERNAL: '服务内部错误',
 };
 
